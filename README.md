@@ -1,4 +1,4 @@
-# FastqBLAST Readme
+# FastqBLAST 
 ***
 > **Author**: Danielle Novick  
 > **Last Update**: February 15, 2017  
