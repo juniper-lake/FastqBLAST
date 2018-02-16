@@ -304,14 +304,16 @@ def tabular_report(sample_dictionary, blast_dictionary):
     records = []
     for record in blast_dict.keys():
         records.append(blast_dict[record]['SeqID'])
-    columns = list(next(iter(blast_dict.values())).keys())
+    columns = ["SeqID", "Sequence", "SeqLength", "Description", "Accession", "Db", "Score", "E_value", "Percent_Identity", "Organism", "Source", "Domain", "Taxonomy"]
+    # columns = list(next(iter(blast_dict.values())).keys())
     OUT = open("blast_report.txt", "w")
     OUT.write('\t'.join(columns) + '\n')
     for record in blast_dict.keys():
         OUT.write('\t'.join([str(blast_dict[record][x]) for x in columns]) + '\n')
     for sample in samples:
         if sample not in records:
-            OUT.write(sample + '\t' + sample_dict['@'+sample]['sequence'] + '\t' + str(len(sample_dict['@'+sample]['sequence'])) + '\t' + 'NO HIT\n')
+            sample_stripped = sample.split("\t")[0]
+            OUT.write(sample_stripped + '\t' + sample_dict['@'+sample]['sequence'] + '\t' + str(len(sample_dict['@'+sample]['sequence'])) + '\t' + 'NO HIT OR SEQUENCE QUALITY BELOW THRESHOLD\n')
     OUT.close()
 
 
