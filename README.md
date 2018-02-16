@@ -1,4 +1,4 @@
-# FastqBLAST 
+# FastqBLAST
 ***
 > **Author**: Danielle Novick  
 > **Last Update**: February 15, 2017  
@@ -85,8 +85,5 @@ required named arguments:
 2. Use the final tabular report to calculate some summary statistics and maybe make some charts based on that output
 3. Include info in tabular report for sequences that result in "NO HIT", such as trimmed sequence length. Right now it's just a catch-all.
 
-## Versions
-**v1.0.1** Fixed program failure from key error when sequence was trimmed to length of 0 bases  
- 
-**v1.0.0** First release
+
 
