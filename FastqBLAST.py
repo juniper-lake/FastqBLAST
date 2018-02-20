@@ -6,16 +6,12 @@
 
 """
 AUTHOR:         Danielle Novick
-
 DATE CREATED:   October 24, 2017
 LAST UPDATE:    February 15, 2018
-
 OBJECTIVE:      This script takes a sample of sequences from a fastq file, trims the low quality ends, BLASTs them,
                 fetches additional info from NCBI, and produces a report.
-
 NCBI's BLAST Usage Guidelines
 https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=DeveloperInfo
-
 BioPython's Manual
 http://biopython.org/DIST/docs/tutorial/Tutorial.html
 """
@@ -24,6 +20,7 @@ import sys
 import random
 import argparse
 import time
+import numpy as np
 from collections import defaultdict
 from Bio.Blast import NCBIWWW
 from Bio.Blast import NCBIXML
@@ -81,7 +78,6 @@ def random_sample(fastq_filename, n_absolute, n_percent):
     """
     Counts the number of lines/sequences in a FASTQ file and then takes a sample that can be entered either as a percent
     or an absolute number (the percent supersedes the absolute if both are entered).
-
     :param fastq_filename: The name of a fastq file
     :param n_absolute: An absolute number of samples that will be taken, superseded by n_percent if that's larger than 0
     :param n_percent: A percent of samples that will be taken, if this is specified it will take precedence over n_absolute
@@ -103,6 +99,15 @@ def random_sample(fastq_filename, n_absolute, n_percent):
         sys.exit()
     else: print("Sampling %s sequences from your file..." % "{:,}".format(sample_size))
     sample_set = [x * 4 for x in random.sample(range(0,int(num_lines/4)), sample_size)]
+
+    summary_report = open('summary_blast_report.txt', 'w')
+    summary_report.write("You have %s sequences in your FASTQ file.\n" % "{:,}".format(num_sequences))
+    summary_report.write("\n")
+    summary_report.write("Sampling %s sequences from your file..." % "{:,}".format(sample_size))
+    summary_report.write("\n")
+    summary_report.write("\n")
+    summary_report.close()
+
     return sample_set
 
 
@@ -110,7 +115,6 @@ def fastq_to_dict(fastq_filename, sample_list):
     """
     Uses a list of sequence starting lines to pull out sequences from a fastq file and stores them in a dictionary,
     then decodes the phred scores and stores those as well
-
     :param fastq_filename: The name of a fastq file
     :param sample_list: A list of integers that correspond to the first line of each sequence that is in the sample
     :return: a two-level defaultdict {header:{'sequence': }, {'ascii':}, {'phred'}}
@@ -133,7 +137,6 @@ def fastq_to_dict(fastq_filename, sample_list):
 def trim_ends(sample_dictionary, leadingQthreshold, trailingQthreshold):
     """
     Trims low quality bases from the leading and trailing ends of sequences
-
     :param sample_dictionary:   a two-level defaultdict {header:{'sequence': }, {'ascii':}, {'phred'}}
     :param leadingQthreshold:   the minimum quality required to keep a base at the leading end of a read
     :param trailingQthreshold:  the minimum quality required to keep a base at the trailing end of a read
@@ -162,7 +165,6 @@ def trim_ends(sample_dictionary, leadingQthreshold, trailingQthreshold):
 def write_fasta(sample_dictionary):
     """
     Writes a FASTA file with the sequence IDs and trimmed sequences from the sample dictionary
-
     :param sample_dictionary:  a two-level defaultdict with information about the sequences to be BLASTed
     :return: blast_queries.fasta
     """
@@ -177,7 +179,6 @@ def write_fasta(sample_dictionary):
 def blast_reads(number_hits):
     """
     Uses Biopython's qblast() to BLAST sequences from a FASTA file, then write the blast results to a file
-
     :param number_hits: The maximum number of hits to return for each BLAST query sequence
     :return: blast_results.xml
     """
@@ -194,7 +195,6 @@ def blast_to_dict():
     """
     Parses BLAST results and stores useful information in a dictionary. Throws an error if the blast_results.xml file
     only contains the queries with no results, which is an indicator that the BLAST was rejected by NCBI
-
     :return: a two-level defaultdict with information from the BLAST results and a flat list of the genes identified by BLAST
     """
     print("Parsing the BLAST results...")
@@ -230,7 +230,6 @@ def fetch_gene_info(gene_list, batch_size=100):
     """
     Uses an NCBI tool called efetch to look up more information about the genes identified by BLAST, then writes
     the results to a file. Epost is used here as good practice for large submissions to efetch
-
     :param gene_list: a list of NCBI gi's that will be submitted to efetch
     :param batch_size: the size of batches of gi's that get submitted to efetch to prevent overloading it
     :return: fetch_results.txt
@@ -268,7 +267,6 @@ def fetch_to_dict(blast_dictionary):
     """
     Stores information from an efetch results file into a dictionary and then merges that dictionary with the BLAST
     results dictionary
-
     :param blast_dictionary: a two level dictionary containing results from a BLAST search
     :return: the blast_dictionary parameter, but with additional keys (Organism, Source, Domain, Taxonomy)
     """
@@ -290,7 +288,6 @@ def fetch_to_dict(blast_dictionary):
 def tabular_report(sample_dictionary, blast_dictionary):
     """
     Writes a report about the sample set using information from BLAST and eFetch
-
     :param sample_dictionary: a two-level defaultdict with information about the sequences from a fastq file
     :param blast_dictionary: a two level dictionary containing results from a BLAST search and eFetch
     :return: blast_report.txt
@@ -304,7 +301,8 @@ def tabular_report(sample_dictionary, blast_dictionary):
     records = []
     for record in blast_dict.keys():
         records.append(blast_dict[record]['SeqID'])
-    columns = ["SeqID", "Sequence", "SeqLength", "Description", "Accession", "Db", "Score", "E_value", "Percent_Identity", "Organism", "Source", "Domain", "Taxonomy"]
+    columns = ["SeqID", "Sequence", "SeqLength", "Description", "Accession", "Db", "Score", "E_value", "Percent_Identity",
+               "Organism", "Source", "Domain", "Taxonomy"]
     # columns = list(next(iter(blast_dict.values())).keys())
     OUT = open("blast_report.txt", "w")
     OUT.write('\t'.join(columns) + '\n')
@@ -313,8 +311,73 @@ def tabular_report(sample_dictionary, blast_dictionary):
     for sample in samples:
         if sample not in records:
             sample_stripped = sample.split("\t")[0]
-            OUT.write(sample_stripped + '\t' + sample_dict['@'+sample]['sequence'] + '\t' + str(len(sample_dict['@'+sample]['sequence'])) + '\t' + 'NO HIT OR SEQUENCE QUALITY BELOW THRESHOLD\n')
+            OUT.write(sample_stripped + '\t' + sample_dict['@'+sample]['sequence'] + '\t'
+                      + str(len(sample_dict['@'+sample]['sequence']))
+                      + '\t' + 'NO HIT OR SEQUENCE QUALITY BELOW THRESHOLD\n')
     OUT.close()
+
+
+def summary_blast_report():
+    """ Analyzes the blast_report.txt and performs some minor statistical analysis
+     to parse apart the results
+     :param None
+     :return: summary_blast_report.txt
+     """
+    overall_avg_length = []
+
+    galgal_count = 0
+    galgal_length = []
+    galgal_identity = []
+
+    other_count = 0
+    other_length = []
+    other_identity = []
+
+    no_hit_count = 0
+
+    blast_results = open('blast_report.txt', 'r')
+
+    for line in blast_results:
+        data = line.split("\t")
+
+        if line.startswith('SeqID'):
+            pass
+
+        elif str(data[3]).startswith('NO'):
+            no_hit_count += 1
+            pass
+
+        elif str(data[9]).startswith('Gallus'):
+            galgal_count += 1
+            overall_avg_length.append(float(data[2]))
+            galgal_length.append(float(data[2]))
+            galgal_identity.append(float(data[8]))
+            pass
+
+        else:
+            other_count += 1
+            overall_avg_length.append(float(data[2]))
+            other_length.append(float(data[2]))
+            other_identity.append(float(data[8]))
+            pass
+
+    blast_results.close()
+
+    total_counts = galgal_count + no_hit_count + other_count
+    testable = galgal_count + other_count
+
+    summary_report = open('summary_blast_report.txt', 'a')
+    summary_report.write("Count\tTestable\tAvg_Blastable_Overall_Length\tGalgal_Count\tGalgal_Avg_Length"
+                         "\tGalgal_Percent_Identity\tOther_Count\tOther_Avg_Length\t"
+                         "Other_Percent_Identity\tNo_Hits_Quality_Issue\n")
+
+    summary_report.write(str(total_counts) + "\t" + str(testable) + "\t" + str(np.average(overall_avg_length)) + "\t"
+                         + str(galgal_count) + "\t" + str(np.average(galgal_length)) + "\t"
+                         + str(np.average(galgal_identity)) + "\t" + str(other_count) + "\t"
+                         + str(np.average(other_length)) + "\t" + str(np.average(other_identity))
+                         + "\t" + str(no_hit_count) + "\n")
+
+    summary_report.close()
 
 
 def main():
@@ -328,6 +391,10 @@ def main():
     fetch_gene_info(gene_list=GeneIDs)
     blast_dict = fetch_to_dict(blast_dictionary=blast_dict)
     tabular_report(sample_dictionary=sample_dict, blast_dictionary=blast_dict)
+
+    # Added portion to summary report
+    summary_blast_report()
+
     print(exitLine)
 
 
@@ -338,4 +405,3 @@ if __name__ == "__main__":
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # - - - - - E n d   o f   F i l e - - - - - - - - - - - - - -
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
