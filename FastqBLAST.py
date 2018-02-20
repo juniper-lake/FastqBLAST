@@ -119,7 +119,7 @@ def fastq_to_dict(fastq_filename, sample_list):
     with open(fastq_filename) as file:
         for counter, line in enumerate(file):
             if counter in sample_list:
-                header = line.rstrip()
+                header = line.rstrip().split("\t")[0]
             elif (counter - 1) in sample_list:
                 sample_dict[header]['sequence'] = line.rstrip()
             elif (counter - 3) in sample_list:
