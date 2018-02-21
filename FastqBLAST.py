@@ -370,7 +370,7 @@ def summary_blast_report():
 
     total_counts= blast_hit_counter + no_hit_counter
    
-    summary_report = open('summary_blast_report.txt', 'w')
+    summary_report = open('summary_blast_report.txt', 'a')
     summary_report.write("\n")
     summary_report.write("\n")
 
