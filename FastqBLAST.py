@@ -8,6 +8,8 @@
 AUTHOR:         Danielle Novick
 DATE CREATED:   October 24, 2017
 LAST UPDATE:    February 15, 2018
+MODIFIED WITH PERMISSION: February 21, 2018 by M. Joseph Tomlinson IV
+
 OBJECTIVE:      This script takes a sample of sequences from a fastq file, trims the low quality ends, BLASTs them,
                 fetches additional info from NCBI, and produces a report.
 NCBI's BLAST Usage Guidelines
@@ -33,7 +35,9 @@ from urllib.error import HTTPError
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 entryLine = "\n\n* * * * * alpha snail on the trail * * * * *\n\n"
+middleLine = "\n\n* * * * * gamma salamander in the alley * * * * *\n\n"
 exitLine = "\n\n* * * * * beta toad on the road * * * * *\n\n"
+
 
 parser = argparse.ArgumentParser(description='This script takes a sample of sequences from a fastq file, trims the \
                                 low quality ends, BLASTs them, fetches additional info from NCBI, and produces a report.')
@@ -323,60 +327,73 @@ def summary_blast_report():
      :param None
      :return: summary_blast_report.txt
      """
-    overall_avg_length = []
+    #counters
+    no_hit_counter = 0
+    blast_hit_counter = 0
 
-    galgal_count = 0
-    galgal_length = []
-    galgal_identity = []
+    average_length=[]
+    average_percent_identity=[]
 
-    other_count = 0
-    other_length = []
-    other_identity = []
-
-    no_hit_count = 0
-
+    #creating parsing dictionary for program
+    source_dict = {}
+    
     blast_results = open('blast_report.txt', 'r')
 
     for line in blast_results:
         data = line.split("\t")
-
+   
         if line.startswith('SeqID'):
-            pass
+            continue
 
         elif str(data[3]).startswith('NO'):
-            no_hit_count += 1
-            pass
-
-        elif str(data[9]).startswith('Gallus'):
-            galgal_count += 1
-            overall_avg_length.append(float(data[2]))
-            galgal_length.append(float(data[2]))
-            galgal_identity.append(float(data[8]))
-            pass
+            no_hit_counter +=1
+            continue
 
         else:
-            other_count += 1
-            overall_avg_length.append(float(data[2]))
-            other_length.append(float(data[2]))
-            other_identity.append(float(data[8]))
-            pass
+            blast_hit_counter +=1
+            average_length.append(float(data[2]))
+            average_percent_identity.append(float(data[8]))
+            
+            verdict = source_dict.get(data[9])
+            
+            if str(verdict) == "None":
+                #creating new entry
+                key = data[9]
+                value=[1, [float(data[2])], [float(data[8])]]
+                source_dict.update({key:value})
+            else:
+                (source_dict[data[9]][0])+=1
+                (source_dict[data[9]][1]).append(float(data[2]))
+                (source_dict[data[9]][2]).append(float(data[8]))                        
 
     blast_results.close()
 
-    total_counts = galgal_count + no_hit_count + other_count
-    testable = galgal_count + other_count
+    total_counts= blast_hit_counter + no_hit_counter
+   
+    summary_report = open('summary_blast_report.txt', 'w')
+    summary_report.write("\n")
+    summary_report.write("\n")
 
-    summary_report = open('summary_blast_report.txt', 'a')
-    summary_report.write("Count\tTestable\tAvg_Blastable_Overall_Length\tGalgal_Count\tGalgal_Avg_Length"
-                         "\tGalgal_Percent_Identity\tOther_Count\tOther_Avg_Length\t"
-                         "Other_Percent_Identity\tNo_Hits_Quality_Issue\n")
+    summary_report.write("The number of sequences analyzed was: " + str(total_counts)+"\n")
+    summary_report.write("The number of non-blastable sequences was: " + str(no_hit_counter)+"\n")
+    summary_report.write("The number of BLASTABLE sequences was: " + str(blast_hit_counter)+"\n")
+    summary_report.write("The average blastable sequence length was: " + str(np.average(average_length)) + "\n")
+    summary_report.write("The average blastable percent identity was: "
+                         + str(np.average(average_percent_identity))+ "\n")
+    summary_report.write("\n")
+    summary_report.write("\n")
 
-    summary_report.write(str(total_counts) + "\t" + str(testable) + "\t" + str(np.average(overall_avg_length)) + "\t"
-                         + str(galgal_count) + "\t" + str(np.average(galgal_length)) + "\t"
-                         + str(np.average(galgal_identity)) + "\t" + str(other_count) + "\t"
-                         + str(np.average(other_length)) + "\t" + str(np.average(other_identity))
-                         + "\t" + str(no_hit_count) + "\n")
+    summary_report.write("Organism\tCounts\tAvg_Seq_Length\tAvg_Percent_Identity\n")
+                    
+    for data in source_dict:
+        organism =(data)
+        counts_of_records = (source_dict[data][0])
+        overall_avg_length = (np.average(source_dict[data][1]))
+        overall_avg_identity = (np.average(source_dict[data][2]))
 
+        summary_report.write(str(organism)+"\t"+str(counts_of_records)+"\t"
+                             +str(overall_avg_length)+"\t"+str(overall_avg_identity)+"\n")
+                              
     summary_report.close()
 
 
@@ -392,6 +409,7 @@ def main():
     blast_dict = fetch_to_dict(blast_dictionary=blast_dict)
     tabular_report(sample_dictionary=sample_dict, blast_dictionary=blast_dict)
 
+    print(middleLine)
     # Added portion to summary report
     summary_blast_report()
 
