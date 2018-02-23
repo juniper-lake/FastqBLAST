@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+#Version FastqBLAST_v1.0.3..4.py (4th number refers to M. Joseph Tomlinson's versions)
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # - - - - - H E A D E R - - - - - - - - - - - - - - - - - - -
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
