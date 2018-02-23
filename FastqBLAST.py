@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-#Version FastqBLAST_v1.0.3..4.py (4th number refers to M. Joseph Tomlinson's versions)
+#Version FastqBLAST_v1.0.3..5.py (4th number refers to M. Joseph Tomlinson's versions)
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # - - - - - H E A D E R - - - - - - - - - - - - - - - - - - -
@@ -10,7 +10,7 @@
 AUTHOR:         Danielle Novick
 DATE CREATED:   October 24, 2017
 LAST UPDATE:    February 15, 2018
-MODIFIED WITH PERMISSION: February 23, 2018 by M. Joseph Tomlinson IV
+MODIFIED WITH PERMISSION: February 21, 2018 by M. Joseph Tomlinson IV
 
 OBJECTIVE:      This script takes a sample of sequences from a fastq file, trims the low quality ends, BLASTs them,
                 fetches additional info from NCBI, and produces a report.
@@ -73,6 +73,8 @@ parser.add_argument('--hitlistSize','-hs', action="store", default=1, type=int,
                      help='The number of blast hits to keep for the final report, default is 1')
 parser.add_argument('--database','-db', action="store", default='nt', type=str,
                      help='Please visit NCBIs website for various database names, default is nt (nucleotide sequence database)')
+parser.add_argument('--taxID','-ID', action="store", default='', type=str,
+                     help='Please visit NCBIs website for various species taxonomy IDs, default is none')
 
 args = parser.parse_args()
 
@@ -156,6 +158,7 @@ def trim_ends(sample_dictionary, leadingQthreshold, trailingQthreshold):
     print("Trimming the low-quality ends...")
     sample_dict = sample_dictionary.copy()
     below_blasting_threshold = 0
+    #introduced verdict when sequence is completely trimmed
     for key in sample_dict.keys():
         for base, Q in enumerate(sample_dict[key]['phred']):
             if Q < leadingQthreshold:
@@ -171,9 +174,13 @@ def trim_ends(sample_dictionary, leadingQthreshold, trailingQthreshold):
                 sample_dict[key]['trimmed_phred'] = sample_dict[key]['trimmed_phred'][:base+1]
                 sample_dict[key]['trimmed_sequence'] = sample_dict[key]['trimmed_sequence'][:base+1]
                 break
-        #Set a min blasting threshold, if below blasting questionable
-        if len(sample_dict[key]['trimmed_sequence']) < 22:
-            below_blasting_threshold +=1     
+        #See How Many Sequences Below Blasting Threshold
+        try:
+            if len(sample_dict[key]['trimmed_sequence']) < 22:
+                below_blasting_threshold +=1
+        except KeyError:
+            below_blasting_threshold +=1
+            continue
     
     print ("Number of trimmed sequences below recommended blasting threshold (22 nt):", below_blasting_threshold)
 
@@ -194,7 +201,8 @@ def write_fasta(sample_dictionary):
     OUT.close()
 
 
-def blast_reads(number_hits, ncbi_database):
+def blast_reads(number_hits, ncbi_database, organism):
+    #blast_reads(number_hits, ncbi_database, entrez_query)
     """
     Uses Biopython's qblast() to BLAST sequences from a FASTA file, then write the blast results to a file
     :param number_hits: The maximum number of hits to return for each BLAST query sequence
@@ -202,9 +210,14 @@ def blast_reads(number_hits, ncbi_database):
     """
     print("Searching for BLAST hits...")
     fasta_string = open("blast_queries.fasta").read()
-    #result_handle = NCBIWWW.qblast("blastn", "nt", fasta_string, hitlist_size=number_hits)
     print ("The ncbi database being searched is:", ncbi_database)
-    result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, hitlist_size=number_hits)
+    if len(organism) > 0:
+        print ("The organism being searched is: ", organism)
+        query ='"txid'+organism+'[ORGN]"'
+        result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, hitlist_size=number_hits, entrez_query=query)
+    else:
+        print ("No organism is designated")
+        result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, hitlist_size=number_hits)
     blast_result = open("blast_results.xml", "w")
     blast_result.write(result_handle.read())
     blast_result.close()
@@ -432,7 +445,7 @@ def main():
     sample_dict = trimming_results[0]
     below_blasting_threshold = trimming_results[1]
     write_fasta(sample_dictionary=sample_dict)
-    blast_reads(number_hits=args.hitlistSize, ncbi_database=args.database)
+    blast_reads(number_hits=args.hitlistSize, ncbi_database=args.database, organism=args.taxID)
     blast_dict, GeneIDs = blast_to_dict()
     fetch_gene_info(gene_list=GeneIDs)
     blast_dict = fetch_to_dict(blast_dictionary=blast_dict)
@@ -452,3 +465,4 @@ if __name__ == "__main__":
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # - - - - - E n d   o f   F i l e - - - - - - - - - - - - - -
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
