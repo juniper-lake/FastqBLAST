@@ -14,6 +14,8 @@ OBJECTIVE:      This script takes a sample of sequences from a fastq file, trims
                 fetches additional info from NCBI, and produces a report.
 NCBI's BLAST Usage Guidelines
 https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=DeveloperInfo
+NCBI's Databases 
+https://www.ncbi.nlm.nih.gov/books/NBK62345/#_blast_ftp_site_The_blastdb_subdirectory_
 BioPython's Manual
 http://biopython.org/DIST/docs/tutorial/Tutorial.html
 """
@@ -67,10 +69,13 @@ parser.add_argument('--trailingQ','-tq', action="store", default=20, type=int,
                      help='The minimum quality required to keep a base at the trailing end of a read, default is 20')
 parser.add_argument('--hitlistSize','-hs', action="store", default=1, type=int,
                      help='The number of blast hits to keep for the final report, default is 1')
+parser.add_argument('--database','-db', action="store", default='nt', type=str,
+                     help='Please visit NCBIs website for various database names, default is nt (nucleotide sequence database)')
 
 args = parser.parse_args()
 
 Entrez.email = args.email
+
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -148,6 +153,7 @@ def trim_ends(sample_dictionary, leadingQthreshold, trailingQthreshold):
     """
     print("Trimming the low-quality ends...")
     sample_dict = sample_dictionary.copy()
+    below_blasting_threshold = 0
     for key in sample_dict.keys():
         for base, Q in enumerate(sample_dict[key]['phred']):
             if Q < leadingQthreshold:
@@ -163,7 +169,13 @@ def trim_ends(sample_dictionary, leadingQthreshold, trailingQthreshold):
                 sample_dict[key]['trimmed_phred'] = sample_dict[key]['trimmed_phred'][:base+1]
                 sample_dict[key]['trimmed_sequence'] = sample_dict[key]['trimmed_sequence'][:base+1]
                 break
-    return sample_dict
+        #Set a min blasting threshold, if below blasting questionable
+        if len(sample_dict[key]['trimmed_sequence']) < 22:
+            below_blasting_threshold +=1     
+    
+    print ("Number of trimmed sequences below recommended blasting threshold (22 nt):", below_blasting_threshold)
+
+    return (sample_dict, below_blasting_threshold)
 
 
 def write_fasta(sample_dictionary):
@@ -180,7 +192,7 @@ def write_fasta(sample_dictionary):
     OUT.close()
 
 
-def blast_reads(number_hits):
+def blast_reads(number_hits, ncbi_database):
     """
     Uses Biopython's qblast() to BLAST sequences from a FASTA file, then write the blast results to a file
     :param number_hits: The maximum number of hits to return for each BLAST query sequence
@@ -188,7 +200,9 @@ def blast_reads(number_hits):
     """
     print("Searching for BLAST hits...")
     fasta_string = open("blast_queries.fasta").read()
-    result_handle = NCBIWWW.qblast("blastn", "nt", fasta_string, hitlist_size=number_hits)
+    #result_handle = NCBIWWW.qblast("blastn", "nt", fasta_string, hitlist_size=number_hits)
+    print ("The ncbi database being searched is:", ncbi_database)
+    result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, hitlist_size=number_hits)
     blast_result = open("blast_results.xml", "w")
     blast_result.write(result_handle.read())
     blast_result.close()
@@ -321,7 +335,7 @@ def tabular_report(sample_dictionary, blast_dictionary):
     OUT.close()
 
 
-def summary_blast_report():
+def summary_blast_report(below_blasting_threshold):
     """ Analyzes the blast_report.txt and performs some minor statistical analysis
      to parse apart the results
      :param None
@@ -332,6 +346,7 @@ def summary_blast_report():
     blast_hit_counter = 0
 
     average_length=[]
+    average_score=[]
     average_percent_identity=[]
 
     #creating parsing dictionary for program
@@ -352,6 +367,7 @@ def summary_blast_report():
         else:
             blast_hit_counter +=1
             average_length.append(float(data[2]))
+            average_score.append(float(data[6]))
             average_percent_identity.append(float(data[8]))
             
             verdict = source_dict.get(data[9])
@@ -359,12 +375,13 @@ def summary_blast_report():
             if str(verdict) == "None":
                 #creating new entry
                 key = data[9]
-                value=[1, [float(data[2])], [float(data[8])]]
+                value=[1, [float(data[2])],[float(data[6])], [float(data[8])]]
                 source_dict.update({key:value})
             else:
                 (source_dict[data[9]][0])+=1
                 (source_dict[data[9]][1]).append(float(data[2]))
-                (source_dict[data[9]][2]).append(float(data[8]))                        
+                (source_dict[data[9]][2]).append(float(data[6]))
+                (source_dict[data[9]][3]).append(float(data[8]))                        
 
     blast_results.close()
 
@@ -375,24 +392,32 @@ def summary_blast_report():
     summary_report.write("\n")
 
     summary_report.write("The number of sequences analyzed was: " + str(total_counts)+"\n")
-    summary_report.write("The number of non-blastable sequences was: " + str(no_hit_counter)+"\n")
-    summary_report.write("The number of BLASTABLE sequences was: " + str(blast_hit_counter)+"\n")
-    summary_report.write("The average blastable sequence length was: " + str(np.average(average_length)) + "\n")
-    summary_report.write("The average blastable percent identity was: "
+    summary_report.write("The number of sequences with no results: " + str(no_hit_counter)+"\n")
+    summary_report.write("Note: There were "+ str(below_blasting_threshold) + 
+        " sequences below recommended blasting threshold (22 nt)\n")
+    summary_report.write("\n")
+    summary_report.write("Sequences with Results\n")
+    summary_report.write("The number of sequences with results: " + str(blast_hit_counter)+"\n")
+    summary_report.write("The average sequence length was: " + str(np.average(average_length)) + "\n")
+    summary_report.write("The average score was: "
+                         + str(np.average(average_score))+ "\n")
+    summary_report.write("The average percent identity was: "
                          + str(np.average(average_percent_identity))+ "\n")
     summary_report.write("\n")
     summary_report.write("\n")
 
-    summary_report.write("Organism\tCounts\tAvg_Seq_Length\tAvg_Percent_Identity\n")
+    summary_report.write("Organism\tCounts\tAvg_Seq_Length\tAvg_Score\tAvg_Percent_Identity\n")
                     
     for data in source_dict:
         organism =(data)
         counts_of_records = (source_dict[data][0])
         overall_avg_length = (np.average(source_dict[data][1]))
-        overall_avg_identity = (np.average(source_dict[data][2]))
+        overall_avg_score = (np.average(source_dict[data][2]))
+        overall_avg_identity = (np.average(source_dict[data][3]))
 
         summary_report.write(str(organism)+"\t"+str(counts_of_records)+"\t"
-                             +str(overall_avg_length)+"\t"+str(overall_avg_identity)+"\n")
+                             +str(overall_avg_length)+"\t"+str(overall_avg_score)+"\t"
+                             +str(overall_avg_identity)+"\n")
                               
     summary_report.close()
 
@@ -401,9 +426,11 @@ def main():
     print(entryLine)
     sample_set = random_sample(fastq_filename=args.filename, n_absolute=args.nAbsolute, n_percent=args.nPercent)
     sample_dict = fastq_to_dict(fastq_filename=args.filename, sample_list=sample_set)
-    sample_dict = trim_ends(sample_dictionary=sample_dict,leadingQthreshold=args.leadingQ, trailingQthreshold=args.trailingQ)
+    trimming_results = trim_ends(sample_dictionary=sample_dict,leadingQthreshold=args.leadingQ, trailingQthreshold=args.trailingQ)
+    sample_dict = trimming_results[0]
+    below_blasting_threshold = trimming_results[1]
     write_fasta(sample_dictionary=sample_dict)
-    blast_reads(number_hits=args.hitlistSize)
+    blast_reads(number_hits=args.hitlistSize, ncbi_database=args.database)
     blast_dict, GeneIDs = blast_to_dict()
     fetch_gene_info(gene_list=GeneIDs)
     blast_dict = fetch_to_dict(blast_dictionary=blast_dict)
@@ -411,7 +438,7 @@ def main():
 
     print(middleLine)
     # Added portion to summary report
-    summary_blast_report()
+    summary_blast_report(below_blasting_threshold)
 
     print(exitLine)
 
