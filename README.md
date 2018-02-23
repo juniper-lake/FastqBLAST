@@ -5,7 +5,7 @@
 > **Creation Date**: October 24, 2017
 
 > **Modified Date**: Febuary 23, 2018 by M. Joseph Tomlinson IV
-Added summary report file and ability to blast different NCBI databases
+> Added summary report file and ability to blast different NCBI databases
 
 ## Program Description
 
