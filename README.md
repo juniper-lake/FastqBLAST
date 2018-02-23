@@ -40,7 +40,8 @@ Running `python FastqBLAST.py --help` should return the following help file with
 <pre>
 usage: FastqBLAST.py [-h] --email EMAIL [--ascii64 ASCII64] [--nPercent NPERCENT]
                  [--nAbsolute NABSOLUTE] [--leadingQ LEADINGQ]
-                 [--trailingQ TRAILINGQ] [--hitlistSize HITLISTSIZE]
+                 [--trailingQ TRAILINGQ] [--hitlistSize HITLISTSIZE] [--database DATABASE]
+                 
                  filename
 
 This script takes a sample of sequences from a fastq file, trims the low
@@ -72,6 +73,14 @@ optional arguments:
   --hitlistSize HITLISTSIZE, -hs HITLISTSIZE
                         The number of blast hits to keep for the final report,
                         default is 1
+  --taxID TAXID, -ID
+                        The specific entrez species ID, to limit the blast search
+                        to that organism, default is None
+                        Example Species Entrez IDs:
+                        chickens - 9031
+                        humans - 9606
+                        mouse - 10090
+                        giant panda - 9646
   --database DATABASE, -db DATABASE 
                         NCBI database used in blast search,
                         default is nt 
@@ -83,7 +92,7 @@ optional arguments:
 
                         There are many more databases that can be blasted and a
                         full breakdown of NCBI databases can be found at the following link:
-                        https://www.ncbi.nlm.nih.gov/books/NBK62345/#_blast_ftp_site_The_blastdb_subdirectory_         
+                        https://www.ncbi.nlm.nih.gov/books/NBK62345/#_blast_ftp_site_The_blastdb_subdirectory/
 
 required named arguments:
   --email EMAIL, -e EMAIL
