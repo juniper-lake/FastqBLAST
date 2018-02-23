@@ -8,7 +8,7 @@
 AUTHOR:         Danielle Novick
 DATE CREATED:   October 24, 2017
 LAST UPDATE:    February 15, 2018
-MODIFIED WITH PERMISSION: February 21, 2018 by M. Joseph Tomlinson IV
+MODIFIED WITH PERMISSION: February 23, 2018 by M. Joseph Tomlinson IV
 
 OBJECTIVE:      This script takes a sample of sequences from a fastq file, trims the low quality ends, BLASTs them,
                 fetches additional info from NCBI, and produces a report.
