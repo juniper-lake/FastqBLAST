@@ -21,6 +21,7 @@ This program takes a sample of sequences from a fastq file, trims the low qualit
 * argparse
 * time
 * collections
+* numpy
 
 ## Running the Program
 To run the program with all default settings, use the following command.
