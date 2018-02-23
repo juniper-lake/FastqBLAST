@@ -4,7 +4,8 @@
 > **Last Update**: February 15, 2017  
 > **Creation Date**: October 24, 2017
 
-> **Modified Date**: Febuary 20, 2018 (created summary output file) by M. Joseph Tomlinson IV
+> **Modified Date**: Febuary 23, 2018 by M. Joseph Tomlinson IV
+Added summary report file and ability to blast different NCBI databases
 
 ## Program Description
 
@@ -70,6 +71,18 @@ optional arguments:
   --hitlistSize HITLISTSIZE, -hs HITLISTSIZE
                         The number of blast hits to keep for the final report,
                         default is 1
+  --database DATABASE, -db DATABASE 
+                        NCBI database used in blast search,
+                        default is nt 
+                        Example Database Names from NCBI:
+                        nt - nucleotide database (sequences from tons of databases)
+                        est_human - human subset of EST database
+                        est_mouse - mouse subset of EST database
+                        Note: EST stands for "Expressed Sequence TAG"
+
+                        There are many more databases that can be blasted and a
+                        full breakdown of NCBI databases can be found at the following link:
+                        https://www.ncbi.nlm.nih.gov/books/NBK62345/#_blast_ftp_site_The_blastdb_subdirectory_         
 
 required named arguments:
   --email EMAIL, -e EMAIL
