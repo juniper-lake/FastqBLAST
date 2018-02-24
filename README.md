@@ -1,7 +1,7 @@
 # FastqBLAST
 ***
 > **Author**: Danielle Novick  
-> **Last Update**: February 15, 2017  
+> **Last Update**: February 23, 2017  
 > **Creation Date**: October 24, 2017
 
 
