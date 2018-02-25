@@ -4,8 +4,8 @@
 > **Last Update**: February 15, 2017  
 > **Creation Date**: October 24, 2017
 
-> **Modified Date**: Febuary 23, 2018 by M. Joseph Tomlinson IV  
-Added summary report file and ability to blast different NCBI databases
+> **Modified Date**: Febuary 24, 2018 by M. Joseph Tomlinson IV  
+Summary Report file, Ability to Change Databases and Organism Searches
 
 ## Program Description
 
