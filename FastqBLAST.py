@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-#Version FastqBLAST_v1.0.3..5.py (4th number refers to M. Joseph Tomlinson's versions)
+#Version FastqBLAST_v1.0.3..6.py
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # - - - - - H E A D E R - - - - - - - - - - - - - - - - - - -
@@ -10,7 +10,9 @@
 AUTHOR:         Danielle Novick
 DATE CREATED:   October 24, 2017
 LAST UPDATE:    February 15, 2018
-MODIFIED WITH PERMISSION: February 21, 2018 by M. Joseph Tomlinson IV
+MODIFIED WITH PERMISSION: February 24, 2018 by M. Joseph Tomlinson IV
+MODIFICATIONS: Summary Report file, Ability to Change Databases and Perform Organism Searches
+
 
 OBJECTIVE:      This script takes a sample of sequences from a fastq file, trims the low quality ends, BLASTs them,
                 fetches additional info from NCBI, and produces a report.
@@ -213,8 +215,10 @@ def blast_reads(number_hits, ncbi_database, organism):
     print ("The ncbi database being searched is:", ncbi_database)
     if len(organism) > 0:
         print ("The organism being searched is: ", organism)
-        query ='"txid'+organism+'[ORGN]"'
-        result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, hitlist_size=number_hits, entrez_query=query)
+        query ='"txid'+str(organism)+'"'
+        #Example format for submiting to NCBI --- if [ORGN] included on query get bounced by NCBI ---unknown error
+        #result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, entrez_query="txid9606[ORGN]", hitlist_size=number_hits)
+        result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, entrez_query=query, hitlist_size=number_hits)
     else:
         print ("No organism is designated")
         result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, hitlist_size=number_hits)
@@ -465,4 +469,3 @@ if __name__ == "__main__":
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # - - - - - E n d   o f   F i l e - - - - - - - - - - - - - -
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
