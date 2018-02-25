@@ -5,7 +5,7 @@
 > **Creation Date**: October 24, 2017
 
 > **Modified Date**: Febuary 24, 2018 by M. Joseph Tomlinson IV  
-Summary Report file, Ability to Change Databases and Organism Searches
+Summary Report file, Ability to Change Databases and Perform Organism Searches
 
 ## Program Description
 
