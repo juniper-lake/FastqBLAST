@@ -84,6 +84,9 @@ required named arguments:
 1. Wrap the BLAST function in a try/except block to make 2-3 attempts before giving up and throwing the error about the query being rejected.  
 2. Use the final tabular report to calculate some summary statistics and maybe make some charts based on that output
 3. Include info in tabular report for sequences that result in "NO HIT", such as trimmed sequence length. Right now it's just a catch-all.
+4. Build in option to BLAST specific organisms (taxID)
+5. Build in option to BLAST speific databases (db)
+6. BLAST report currently reports sequence/length of sequence from BLAST results, need to also include sequence/length of original sequence
 
 
 
