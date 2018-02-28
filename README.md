@@ -4,8 +4,9 @@
 > **Last Update**: February 15, 2017  
 > **Creation Date**: October 24, 2017
 
-> **Modified Date**: Febuary 24, 2018 by M. Joseph Tomlinson IV  
-Summary Report file, Ability to Change Databases and Perform Organism Searches
+> **Modified Date**: Febuary 28, 2018 by M. Joseph Tomlinson IV  
+Created Summary Report file, Built in ability to Change Databases and Perform Organism Searches,
+Split the Blast results into two files (Hit vs. No Hits), Fixed some minor issues
 
 ## Program Description
 
