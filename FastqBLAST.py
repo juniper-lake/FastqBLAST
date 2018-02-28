@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-#Version FastqBLAST_v1.0.3..6.py
+#Version FastqBLAST_iv2.0.0.py
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # - - - - - H E A D E R - - - - - - - - - - - - - - - - - - -
@@ -10,9 +10,9 @@
 AUTHOR:         Danielle Novick
 DATE CREATED:   October 24, 2017
 LAST UPDATE:    February 15, 2018
-MODIFIED WITH PERMISSION: February 24, 2018 by M. Joseph Tomlinson IV
-MODIFICATIONS: Summary Report file, Ability to Change Databases and Perform Organism Searches
-
+MODIFIED WITH PERMISSION: February 28, 2018 by M. Joseph Tomlinson IV
+MODIFICATIONS: Created Summary Report file, Built in ability to Change Databases and Perform Organism Searches
+               Split the Blast results into two files (Hit vs. No Hits), Fixed some minor issues
 
 OBJECTIVE:      This script takes a sample of sequences from a fastq file, trims the low quality ends, BLASTs them,
                 fetches additional info from NCBI, and produces a report.
@@ -29,6 +29,8 @@ import random
 import argparse
 import time
 import numpy as np
+import time
+import os
 from collections import defaultdict
 from Bio.Blast import NCBIWWW
 from Bio.Blast import NCBIXML
@@ -98,6 +100,9 @@ def random_sample(fastq_filename, n_absolute, n_percent):
     :param n_percent: A percent of samples that will be taken, if this is specified it will take precedence over n_absolute
     :return: a list of integers that correspond to the first line of each sequence that is in the sample
     """
+    summary_report = open('summary_blast_report.txt', 'w')
+
+
     with open(fastq_filename) as file:
         for counter, line in enumerate(file, 1):  # start index at 1 instead of 0
             pass
@@ -115,11 +120,10 @@ def random_sample(fastq_filename, n_absolute, n_percent):
     else: print("Sampling %s sequences from your file..." % "{:,}".format(sample_size))
     sample_set = [x * 4 for x in random.sample(range(0,int(num_lines/4)), sample_size)]
 
-    summary_report = open('summary_blast_report.txt', 'w')
+    
     summary_report.write("You have %s sequences in your FASTQ file.\n" % "{:,}".format(num_sequences))
     summary_report.write("\n")
     summary_report.write("Sampling %s sequences from your file..." % "{:,}".format(sample_size))
-    summary_report.write("\n")
     summary_report.write("\n")
     summary_report.close()
 
@@ -176,17 +180,8 @@ def trim_ends(sample_dictionary, leadingQthreshold, trailingQthreshold):
                 sample_dict[key]['trimmed_phred'] = sample_dict[key]['trimmed_phred'][:base+1]
                 sample_dict[key]['trimmed_sequence'] = sample_dict[key]['trimmed_sequence'][:base+1]
                 break
-        #See How Many Sequences Below Blasting Threshold
-        try:
-            if len(sample_dict[key]['trimmed_sequence']) < 22:
-                below_blasting_threshold +=1
-        except KeyError:
-            below_blasting_threshold +=1
-            continue
-    
-    print ("Number of trimmed sequences below recommended blasting threshold (22 nt):", below_blasting_threshold)
 
-    return (sample_dict, below_blasting_threshold)
+    return (sample_dict)
 
 
 def write_fasta(sample_dictionary):
@@ -195,7 +190,7 @@ def write_fasta(sample_dictionary):
     :param sample_dictionary:  a two-level defaultdict with information about the sequences to be BLASTed
     :return: blast_queries.fasta
     """
-    OUT = open('blast_queries.fasta', 'w')
+    OUT = open('Log_Directory/blast_queries.fasta', 'w')
     for key in sample_dictionary:
         # failsafe for sequences that are trimmed to be 0 bases long
         if 'trimmed_sequence' in  sample_dictionary[key].keys():
@@ -211,7 +206,7 @@ def blast_reads(number_hits, ncbi_database, organism):
     :return: blast_results.xml
     """
     print("Searching for BLAST hits...")
-    fasta_string = open("blast_queries.fasta").read()
+    fasta_string = open("Log_Directory/blast_queries.fasta").read()
     print ("The ncbi database being searched is:", ncbi_database)
     if len(organism) > 0:
         print ("The organism being searched is: ", organism)
@@ -222,7 +217,7 @@ def blast_reads(number_hits, ncbi_database, organism):
     else:
         print ("No organism is designated")
         result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, hitlist_size=number_hits)
-    blast_result = open("blast_results.xml", "w")
+    blast_result = open("Log_Directory/blast_results.xml", "w")
     blast_result.write(result_handle.read())
     blast_result.close()
     result_handle.close()
@@ -237,7 +232,7 @@ def blast_to_dict():
     print("Parsing the BLAST results...")
     GeneIDs = []
     blast_dict = defaultdict(lambda: defaultdict())
-    for record in NCBIXML.parse(open("blast_results.xml")):
+    for record in NCBIXML.parse(open("Log_Directory/blast_results.xml")):
         for align in record.alignments:
             for hsp in align.hsps:
                 percent_identity = round(100 * float(hsp.identities) / float(hsp.align_length),2)  # https://www.dnastar.com/megalign_help/index.html#!Documents/calculationofpercentidentity.htm
@@ -278,7 +273,7 @@ def fetch_gene_info(gene_list, batch_size=100):
     webenv = result["WebEnv"]
     query_key = result["QueryKey"]
     count = len(gene_list)
-    OUT = open("fetch_results.txt", "w")
+    OUT = open("Log_Directory/fetch_results.txt", "w")
     for start in range(0, count, batch_size):
         end = min(count, start + batch_size)
         print("Fetching records %i through %i" % (start + 1, end))
@@ -309,7 +304,7 @@ def fetch_to_dict(blast_dictionary):
     """
     blast_dict = blast_dictionary.copy()
     fetch_dict = defaultdict(lambda: defaultdict())
-    for record in SeqIO.parse("fetch_results.txt", "genbank"):
+    for record in SeqIO.parse("Log_Directory/fetch_results.txt", "genbank"):
         fetch_dict[record.id]['Organism'] = record.annotations['organism']
         fetch_dict[record.id]['Source'] = record.annotations['source']
         fetch_dict[record.id]['Domain'] = record.annotations['taxonomy'][0]
@@ -327,82 +322,173 @@ def tabular_report(sample_dictionary, blast_dictionary):
     Writes a report about the sample set using information from BLAST and eFetch
     :param sample_dictionary: a two-level defaultdict with information about the sequences from a fastq file
     :param blast_dictionary: a two level dictionary containing results from a BLAST search and eFetch
-    :return: blast_report.txt
+    :return: blast_hits_report.txt and blast_no_hits_report.txt
     """
     print("Writing the report...")
     sample_dict = sample_dictionary.copy()
     blast_dict = blast_dictionary.copy()
+
+    #creating quick dictionary to pull out trimmed sequence
+    trimmed_data_dict={}
+    for key in sample_dict.keys():
+        trimmed_sequence=(sample_dict[key]['trimmed_sequence'])
+        key = key.strip('@')
+        trimmed_data_dict.update({key:trimmed_sequence})
+
     samples = []
     for sequenceID in sample_dict:
         samples.append(sequenceID[1:])
     records = []
     for record in blast_dict.keys():
         records.append(blast_dict[record]['SeqID'])
-    columns = ["SeqID", "Sequence", "SeqLength", "Description", "Accession", "Db", "Score", "E_value", "Percent_Identity",
-               "Organism", "Source", "Domain", "Taxonomy"]
-    # columns = list(next(iter(blast_dict.values())).keys())
-    OUT = open("blast_report.txt", "w")
+    columns = ["SeqID", "Trimmed Sequence", "Trimmed Sequence Length","BLAST Sequence", 
+    "BLAST SeqLength", "Description", "Accession", "Db", 
+    "Score", "E_value", "Percent_Identity", "Organism", 
+    "Source", "Domain", "Taxonomy"]
+    
+    #Writing
+    OUT = open("blast_hits_report.txt", "w")
     OUT.write('\t'.join(columns) + '\n')
+    
+    NO_HITS_OUT = open("blast_no_hits_report.txt", "w")
+    NO_HITS_OUT.write("SeqID\tOriginal Seq\tOriginal Seq Length"
+        "\tTrimmed Seq\tTrimmed Seq Length\tResult\n")
+
     for record in blast_dict.keys():
-        OUT.write('\t'.join([str(blast_dict[record][x]) for x in columns]) + '\n')
+
+        key=str(blast_dict[record]['SeqID'])
+        trimmed_sequence = trimmed_data_dict[key]
+        length_trimmed_sequence=len(trimmed_data_dict[key])
+        
+        #Used Brute force coding to be able to manipulate and add new columns to output
+        try: 
+            OUT.write(str(blast_dict[record]['SeqID'])
+                +'\t'+str(trimmed_sequence)
+                +'\t'+str(length_trimmed_sequence)
+                +'\t'+str(blast_dict[record]['Sequence'])
+                +'\t'+str(blast_dict[record]['SeqLength'])
+                +'\t'+str(blast_dict[record]['Description'])
+                +'\t'+str(blast_dict[record]['Accession'])
+                +'\t'+str(blast_dict[record]['Db'])
+                +'\t'+str(blast_dict[record]['Score'])
+                +'\t'+str(blast_dict[record]['E_value'])
+                +'\t'+str(blast_dict[record]['Percent_Identity'])
+                +'\t'+str(blast_dict[record]['Organism'])
+                +'\t'+str(blast_dict[record]['Source'])
+                +'\t'+str(blast_dict[record]['Domain'])
+                +'\t'+str(blast_dict[record]['Taxonomy'])+'\n')
+        except KeyError:
+            continue
+
     for sample in samples:
+
         if sample not in records:
             sample_stripped = sample.split("\t")[0]
-            OUT.write(sample_stripped + '\t' + sample_dict['@'+sample]['sequence'] + '\t'
-                      + str(len(sample_dict['@'+sample]['sequence']))
-                      + '\t' + 'NO HIT OR SEQUENCE QUALITY BELOW THRESHOLD\n')
+
+            #Get original trimmed sequence for reference
+            try:
+                trimmed_sequence = trimmed_data_dict[sample_stripped]
+                length_trimmed_sequence=len(trimmed_sequence)
+            except KeyError:
+                trimmed_sequence = '-'
+                length_trimmed_sequence=0
+
+            NO_HITS_OUT.write(sample_stripped
+                #Commend out original data being reported
+                + '\t' + sample_dict['@'+sample]['sequence'] 
+                + '\t' + str(len(sample_dict['@'+sample]['sequence'])) 
+                + '\t' + str(trimmed_sequence)
+                + '\t' + str(length_trimmed_sequence)
+
+                + '\t' + 'NO HIT OR SEQUENCE QUALITY BELOW THRESHOLD\n')
     OUT.close()
+    NO_HITS_OUT.close()
 
 
-def summary_blast_report(below_blasting_threshold):
-    """ Analyzes the blast_report.txt and performs some minor statistical analysis
-     to parse apart the results
-     :param None
+def summary_blast_report(start_time):
+    """ Analyzes the blast_report.txt and blast_no_hits_report.txt and performs some minor statistical analysis
+     to parse apart the final results in summary tables
+     :param start_time (see how long program takes to run)
      :return: summary_blast_report.txt
      """
     #counters
     no_hit_counter = 0
     blast_hit_counter = 0
+    totally_trimmed_counter = 0
 
-    average_length=[]
-    average_score=[]
-    average_percent_identity=[]
-
-    #creating parsing dictionary for program
-    source_dict = {}
+    #ALL DATA Results
+    global_avg_trimmed_length=[]
     
-    blast_results = open('blast_report.txt', 'r')
+    #No hits results
+    average_trimmed_no_hit_length=[]
 
-    for line in blast_results:
+    #Only hits results
+    hits_avg_trimmed_length=[]
+    hits_avg_blast_length=[]
+    hits_avg_score=[]
+    hits_avg_percent_identity=[]
+
+    #creating parsing dictionary for program (hits only)
+    blast_hit_dict = {}
+    
+    #Opening and Parsing blast_report.txt
+    blast_hit_results = open('blast_hits_report.txt', 'r')
+
+    for line in blast_hit_results:
         data = line.split("\t")
    
         if line.startswith('SeqID'):
             continue
 
-        elif str(data[3]).startswith('NO'):
-            no_hit_counter +=1
-            continue
-
         else:
             blast_hit_counter +=1
-            average_length.append(float(data[2]))
-            average_score.append(float(data[6]))
-            average_percent_identity.append(float(data[8]))
             
-            verdict = source_dict.get(data[9])
+            #Trimmed Sequence Stats
+            global_avg_trimmed_length.append(float(data[2]))
+
+            #Hits Stats
+            hits_avg_trimmed_length.append(float(data[2]))
+            hits_avg_blast_length.append(float(data[4]))
+            hits_avg_score.append(float(data[8]))
+            hits_avg_percent_identity.append(float(data[10]))
             
+            #Test to see if organism in dictionary
+            verdict = blast_hit_dict.get(data[11])
+            
+            #If not in 
             if str(verdict) == "None":
                 #creating new entry
-                key = data[9]
-                value=[1, [float(data[2])],[float(data[6])], [float(data[8])]]
-                source_dict.update({key:value})
+                key = data[11]
+                #Value[Counts, Trimmed_Length, Blast Length, Blast_Score, Blast_Percent_Identity]
+                value=[1, [float(data[2])], [float(data[4])], [float(data[8])], [float(data[10])] ]
+                blast_hit_dict.update({key:value})
             else:
-                (source_dict[data[9]][0])+=1
-                (source_dict[data[9]][1]).append(float(data[2]))
-                (source_dict[data[9]][2]).append(float(data[6]))
-                (source_dict[data[9]][3]).append(float(data[8]))                        
+                #Fills dictionary based on organism name
+                (blast_hit_dict[data[11]][0])+=1
+                (blast_hit_dict[data[11]][1]).append(float(data[2]))
+                (blast_hit_dict[data[11]][2]).append(float(data[4]))
+                (blast_hit_dict[data[11]][3]).append(float(data[8]))
+                (blast_hit_dict[data[11]][4]).append(float(data[10]))                        
 
-    blast_results.close()
+    blast_hit_results.close()
+
+   
+    #Opening and Parsing blast_no_hits_report.txt
+    no_hit_results = open('blast_no_hits_report.txt', 'r')
+    for line in no_hit_results:
+        data = line.split("\t")
+        
+        if line.startswith('SeqID'):
+            continue
+        else:
+            average_trimmed_no_hit_length.append(float(data[4]))
+            no_hit_counter +=1
+            
+            if float(data[4]) == 0:
+                totally_trimmed_counter +=1
+            continue
+    no_hit_results.close
+
 
     total_counts= blast_hit_counter + no_hit_counter
    
@@ -411,43 +497,89 @@ def summary_blast_report(below_blasting_threshold):
     summary_report.write("\n")
 
     summary_report.write("The number of sequences analyzed was: " + str(total_counts)+"\n")
-    summary_report.write("The number of sequences with no results: " + str(no_hit_counter)+"\n")
-    summary_report.write("Note: There were "+ str(below_blasting_threshold) + 
-        " sequences below recommended blasting threshold (22 nt)\n")
-    summary_report.write("\n")
-    summary_report.write("Sequences with Results\n")
-    summary_report.write("The number of sequences with results: " + str(blast_hit_counter)+"\n")
-    summary_report.write("The average sequence length was: " + str(np.average(average_length)) + "\n")
-    summary_report.write("The average score was: "
-                         + str(np.average(average_score))+ "\n")
-    summary_report.write("The average percent identity was: "
-                         + str(np.average(average_percent_identity))+ "\n")
+    summary_report.write("The average trimmed length of ALL sequences: " 
+        + str(round((np.average(global_avg_trimmed_length)),2))+"\n")
     summary_report.write("\n")
     summary_report.write("\n")
 
-    summary_report.write("Organism\tCounts\tAvg_Seq_Length\tAvg_Score\tAvg_Percent_Identity\n")
+    summary_report.write("Sequences with NO BLAST Results\n")
+    summary_report.write("The number of sequences with no results: " + str(no_hit_counter)+ "\n")
+    #Else/if for trimmed sequences when none exist in the file
+    if no_hit_counter == 0:
+        summary_report.write("The average sequence length was: N.A." + "\n")
+        summary_report.write("Number of sequences totally trimmed: N.A." + "\n")
+
+    else:
+        summary_report.write("The average sequence length was: " 
+            + str(round((np.average(average_trimmed_no_hit_length)),2)) +"\n")
+        summary_report.write("Number of sequences totally trimmed: " + str(totally_trimmed_counter) + "\n")
+    
+    summary_report.write("\n")
+    summary_report.write("\n")
+
+    summary_report.write("Sequences with BLAST Hit Results\n")
+    summary_report.write("The number of sequences with BLAST hit results: " + str(blast_hit_counter)+"\n")
+    summary_report.write("The average trimmed sequence length (pre-BLASTING): " 
+        + str(round((np.average(hits_avg_trimmed_length)),2))+"\n")
+    summary_report.write("The average sequence BLAST hit length was: " 
+        + str(round((np.average(hits_avg_blast_length)),2)) + "\n")
+    summary_report.write("The average blast hits score was: "
+                         + str(round((np.average(hits_avg_score)),2))+ "\n")
+    summary_report.write("The average percent identity was: "
+                         + str(round((np.average(hits_avg_percent_identity)),2))+ "\n")
+    summary_report.write("\n")
+    summary_report.write("\n")
+
+    summary_report.write("Organism\tCounts\tTrimmed_Seq_Length\tHits_Avg_Seq_Length\t"
+        "Hits_Avg_Score\tHits_Avg_Percent_Identity\n")
                     
-    for data in source_dict:
+    for data in blast_hit_dict:
         organism =(data)
-        counts_of_records = (source_dict[data][0])
-        overall_avg_length = (np.average(source_dict[data][1]))
-        overall_avg_score = (np.average(source_dict[data][2]))
-        overall_avg_identity = (np.average(source_dict[data][3]))
+        counts_of_records = (blast_hit_dict[data][0])
+        overall_trimmed_length = round((np.average(blast_hit_dict[data][1])),2) 
+        overall_avg_length = round((np.average(blast_hit_dict[data][2])),2)
+        overall_avg_score = round((np.average(blast_hit_dict[data][3])),2)
+        overall_avg_identity = round((np.average(blast_hit_dict[data][4])),2)
 
         summary_report.write(str(organism)+"\t"+str(counts_of_records)+"\t"
-                             +str(overall_avg_length)+"\t"+str(overall_avg_score)+"\t"
-                             +str(overall_avg_identity)+"\n")
-                              
+            +str(overall_trimmed_length)+"\t" 
+            +str(overall_avg_length)+"\t"
+            +str(overall_avg_score)+"\t" 
+            +str(overall_avg_identity)+"\n")
+    
+
+    summary_report.write("\n")
+    summary_report.write("\n")
+    summary_report.write("\n")
+
+    #Started a time in the program to see how long runs take
+    total_time = time.clock() - start_time
+    summary_report.write("Program ran for a total of " + str(round(total_time, 2))+" seconds")
+
     summary_report.close()
 
 
 def main():
     print(entryLine)
+    print ("")
+
+    #Setting up program
+    start_time=time.clock()
+    home_directory = os.getcwd()
+
+    #Making a directory to put all important, but non-essential results in
+        # See if directory exists otherwise make it
+    verdict = os.path.exists('Log_Directory')
+    if str(verdict) == 'False':
+        os.makedirs('Log_Directory')
+    else:
+        print("Log Directory already exists")
+        print("")
+
+    
     sample_set = random_sample(fastq_filename=args.filename, n_absolute=args.nAbsolute, n_percent=args.nPercent)
     sample_dict = fastq_to_dict(fastq_filename=args.filename, sample_list=sample_set)
-    trimming_results = trim_ends(sample_dictionary=sample_dict,leadingQthreshold=args.leadingQ, trailingQthreshold=args.trailingQ)
-    sample_dict = trimming_results[0]
-    below_blasting_threshold = trimming_results[1]
+    sample_dict = trim_ends(sample_dictionary=sample_dict,leadingQthreshold=args.leadingQ, trailingQthreshold=args.trailingQ)
     write_fasta(sample_dictionary=sample_dict)
     blast_reads(number_hits=args.hitlistSize, ncbi_database=args.database, organism=args.taxID)
     blast_dict, GeneIDs = blast_to_dict()
@@ -456,9 +588,13 @@ def main():
     tabular_report(sample_dictionary=sample_dict, blast_dictionary=blast_dict)
 
     print(middleLine)
-    # Added portion to summary report
-    summary_blast_report(below_blasting_threshold)
-
+    
+    summary_blast_report(start_time)
+    
+    total_time = time.clock() - start_time
+    
+    print ("The program ran for ", total_time, " seconds")
+    print ("")
     print(exitLine)
 
 
