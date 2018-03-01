@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-#Version FastqBLAST_iv2.0.0.py
+#Version FastqBLAST_iv3.0.0.py
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # - - - - - H E A D E R - - - - - - - - - - - - - - - - - - -
@@ -10,9 +10,10 @@
 AUTHOR:         Danielle Novick
 DATE CREATED:   October 24, 2017
 LAST UPDATE:    February 15, 2018
-MODIFIED WITH PERMISSION: February 28, 2018 by M. Joseph Tomlinson IV
+LAST MODIFIED WITH PERMISSION: March 1, 2018 by M. Joseph Tomlinson IV
 MODIFICATIONS: Created Summary Report file, Built in ability to Change Databases and Perform Organism Searches
-               Split the Blast results into two files (Hit vs. No Hits), Fixed some minor issues
+               Split the Blast results into two files (Hit vs. No Hits), Fixed some minor issues, Fix a big bug with 
+               gene duplicates in data not being reported properly
 
 OBJECTIVE:      This script takes a sample of sequences from a fastq file, trims the low quality ends, BLASTs them,
                 fetches additional info from NCBI, and produces a report.
@@ -211,9 +212,8 @@ def blast_reads(number_hits, ncbi_database, organism):
     if len(organism) > 0:
         print ("The organism being searched is: ", organism)
         query ='"txid'+str(organism)+'"'
-        #Example format for submiting to NCBI --- if [ORGN] included on query get bounced by NCBI ---unknown error
-        #result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, entrez_query="txid9606[ORGN]", hitlist_size=number_hits)
-        result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, entrez_query=query, hitlist_size=number_hits)
+        result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, entrez_query=query, hitlist_size=number_hits,
+            expect=10.0, nucl_penalty=-2, nucl_reward=1, megablast=True, word_size=28, expect_low=True, gapcosts='0 2.5')
     else:
         print ("No organism is designated")
         result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, hitlist_size=number_hits)
@@ -240,22 +240,26 @@ def blast_to_dict():
                 # this uses NCBI's gi number (GenInfo Identifier) which is reliable now but getting phased out, so might
                 # need to change to hit_id[3] at some point
                 GeneIDs.append(hit_id[1])
-                blast_dict[align.title]['SeqID'] = record.query
-                blast_dict[align.title]['Sequence'] = hsp.query
-                blast_dict[align.title]['SeqLength'] = len(hsp.query)
-                blast_dict[align.title]['Description'] = hit_id[4]
-                blast_dict[align.title]['Accession'] = hit_id[3]
-                blast_dict[align.title]['Db'] = hit_id[2]
-                blast_dict[align.title]['Score'] = hsp.score
-                blast_dict[align.title]['E_value'] = hsp.expect
-                blast_dict[align.title]['Percent_Identity'] = percent_identity
+                blast_dict[record.query]['Hit_ID'] = align.title
+                blast_dict[record.query]['Gene_ID'] = hit_id[1]
+                blast_dict[record.query]['Sequence'] = hsp.query
+                blast_dict[record.query]['SeqLength'] = len(hsp.query)
+                blast_dict[record.query]['Description'] = hit_id[4]
+                blast_dict[record.query]['Accession'] = hit_id[3]
+                blast_dict[record.query]['Db'] = hit_id[2]
+                blast_dict[record.query]['Score'] = hsp.score
+                blast_dict[record.query]['E_value'] = hsp.expect
+                blast_dict[record.query]['Percent_Identity'] = percent_identity
     GeneIDs = list(set(GeneIDs))
     if not GeneIDs:
         print('\nYour BLAST query was rejected. Please enter a smaller sample size or try running this script \
               at a better time.\nNCBI asks that you run scripts on weekends or between 9pm and 5am Eastern \
               time on weekdays if more than 50 searches will be submitted.')
         sys.exit()
-    return blast_dict, GeneIDs
+
+    print (blast_dict)
+    
+    return blast_dict, GeneIDs, 
 
 
 def fetch_gene_info(gene_list, batch_size=100):
@@ -314,6 +318,7 @@ def fetch_to_dict(blast_dictionary):
             if accession in blast_dict[record]["Accession"]:
                 for accession_item in next(iter(fetch_dict.values())).keys():
                     blast_dict[record][accession_item] = fetch_dict[accession][accession_item]
+
     return blast_dict
 
 
@@ -338,9 +343,9 @@ def tabular_report(sample_dictionary, blast_dictionary):
     samples = []
     for sequenceID in sample_dict:
         samples.append(sequenceID[1:])
-    records = []
-    for record in blast_dict.keys():
-        records.append(blast_dict[record]['SeqID'])
+    
+    records = blast_dict.keys()
+    
     columns = ["SeqID", "Trimmed Sequence", "Trimmed Sequence Length","BLAST Sequence", 
     "BLAST SeqLength", "Description", "Accession", "Db", 
     "Score", "E_value", "Percent_Identity", "Organism", 
@@ -356,13 +361,12 @@ def tabular_report(sample_dictionary, blast_dictionary):
 
     for record in blast_dict.keys():
 
-        key=str(blast_dict[record]['SeqID'])
-        trimmed_sequence = trimmed_data_dict[key]
-        length_trimmed_sequence=len(trimmed_data_dict[key])
+        trimmed_sequence = trimmed_data_dict[record]
+        length_trimmed_sequence=len(trimmed_data_dict[record])
         
         #Used Brute force coding to be able to manipulate and add new columns to output
         try: 
-            OUT.write(str(blast_dict[record]['SeqID'])
+            OUT.write(str(record)
                 +'\t'+str(trimmed_sequence)
                 +'\t'+str(length_trimmed_sequence)
                 +'\t'+str(blast_dict[record]['Sequence'])
@@ -428,6 +432,10 @@ def summary_blast_report(start_time):
     hits_avg_score=[]
     hits_avg_percent_identity=[]
 
+    #Key word counters
+    ribosomal_counter=[]
+    predicted_counter=[]
+
     #creating parsing dictionary for program (hits only)
     blast_hit_dict = {}
     
@@ -451,6 +459,8 @@ def summary_blast_report(start_time):
             hits_avg_blast_length.append(float(data[4]))
             hits_avg_score.append(float(data[8]))
             hits_avg_percent_identity.append(float(data[10]))
+
+
             
             #Test to see if organism in dictionary
             verdict = blast_hit_dict.get(data[11])
