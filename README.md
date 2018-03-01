@@ -87,6 +87,7 @@ required named arguments:
 4. Build in option to BLAST specific organisms (taxID)
 5. Build in option to BLAST speific databases (db)
 6. BLAST report currently reports sequence/length of sequence from BLAST results, need to also include sequence/length of original sequence
+7. Change BLAST dictionary primary key to sequence ID (instead of Gene ID) because it was overriding sequencing that found the same hit
 
 
 
