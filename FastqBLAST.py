@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-#Version FastqBLAST_iv3.0.0.py
+#Version FastqBLAST_iv4.0.0.py
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # - - - - - H E A D E R - - - - - - - - - - - - - - - - - - -
@@ -10,8 +10,8 @@
 AUTHOR:         Danielle Novick
 DATE CREATED:   October 24, 2017
 LAST UPDATE:    February 15, 2018
-LAST MODIFIED WITH PERMISSION: March 1, 2018 by M. Joseph Tomlinson IV
-MODIFICATIONS: Created Summary Report file, Built in ability to Change Databases and Perform Organism Searches
+LAST MODIFIED WITH PERMISSION: March 2, 2018 by M. Joseph Tomlinson IV
+MODIFICATIONS: Created Summary Report files, Built in ability to Change Databases and Perform Organism Searches
                Split the Blast results into two files (Hit vs. No Hits), Fixed some minor issues, Fix a big bug with 
                gene duplicates in data not being reported properly
 
@@ -257,9 +257,9 @@ def blast_to_dict():
               time on weekdays if more than 50 searches will be submitted.')
         sys.exit()
 
-    print (blast_dict)
-    
-    
+    return blast_dict, GeneIDs,
+
+
 def fetch_gene_info(gene_list, batch_size=100):
     """
     Uses an NCBI tool called efetch to look up more information about the genes identified by BLAST, then writes
@@ -407,23 +407,55 @@ def tabular_report(sample_dictionary, blast_dictionary):
     NO_HITS_OUT.close()
 
 
-def summary_blast_report(start_time):
-    """ Analyzes the blast_report.txt and blast_no_hits_report.txt and performs some minor statistical analysis
-     to parse apart the final results in summary tables
+def parsing_no_hits_data(global_avg_trimmed_length):
+    """ Analyzes the blast_no_hits_report.txt and creates summary reports of the final data
      :param start_time (see how long program takes to run)
-     :return: summary_blast_report.txt
+     :return: counters (no_hit_counter, totally_trimmed_counter) and lists (average_trimmed_no_hit_lenght, 
+        global_avg_trimmed_lenght)
      """
-    #counters
+
+    #No Hit Counter
     no_hit_counter = 0
-    blast_hit_counter = 0
+
+    #Totally trimmed counter
     totally_trimmed_counter = 0
 
-    #ALL DATA Results
-    global_avg_trimmed_length=[]
-    
     #No hits results
     average_trimmed_no_hit_length=[]
 
+    #Opening and Parsing blast_no_hits_report.txt
+    no_hit_results = open('blast_no_hits_report.txt', 'r')
+    for line in no_hit_results:
+        data = line.split("\t")
+        
+        if line.startswith('SeqID'):
+            continue
+        else:
+            average_trimmed_no_hit_length.append(float(data[4]))
+            global_avg_trimmed_length.append(float(data[4]))
+            
+            no_hit_counter +=1
+            
+            if float(data[4]) == 0:
+                totally_trimmed_counter +=1
+            continue
+    no_hit_results.close
+
+
+    return {'no_hit_counter':no_hit_counter, 'totally_trimmed_counter':totally_trimmed_counter, 
+    'average_trimmed_no_hit_length':average_trimmed_no_hit_length, 'global_avg_trimmed_length':global_avg_trimmed_length}
+
+def parsing_hits_data():
+    """ Analyzes the blast_hits_report.txt and creates summary stats of the final data
+     :param none (reads file directly)
+     :return: numerous counters and lists for final analysis
+     """
+    #counters
+    blast_hit_counter = 0
+    
+    #ALL DATA Results
+    global_avg_trimmed_length=[]
+    
     #Only hits results
     hits_avg_trimmed_length=[]
     hits_avg_blast_length=[]
@@ -431,8 +463,7 @@ def summary_blast_report(start_time):
     hits_avg_percent_identity=[]
 
     #Key word counters
-    ribosomal_counter=[]
-    predicted_counter=[]
+    predicted_counter=0
 
     #creating parsing dictionary for program (hits only)
     blast_hit_dict = {}
@@ -448,6 +479,11 @@ def summary_blast_report(start_time):
 
         else:
             blast_hit_counter +=1
+
+            #See How Many Genees are Predicted
+            gene_description=(data[5]).lstrip(' ')
+            if gene_description.startswith('PREDICTED'):
+                predicted_counter += 1
             
             #Trimmed Sequence Stats
             global_avg_trimmed_length.append(float(data[2]))
@@ -457,9 +493,7 @@ def summary_blast_report(start_time):
             hits_avg_blast_length.append(float(data[4]))
             hits_avg_score.append(float(data[8]))
             hits_avg_percent_identity.append(float(data[10]))
-
-
-            
+   
             #Test to see if organism in dictionary
             verdict = blast_hit_dict.get(data[11])
             
@@ -476,30 +510,43 @@ def summary_blast_report(start_time):
                 (blast_hit_dict[data[11]][1]).append(float(data[2]))
                 (blast_hit_dict[data[11]][2]).append(float(data[4]))
                 (blast_hit_dict[data[11]][3]).append(float(data[8]))
-                (blast_hit_dict[data[11]][4]).append(float(data[10]))                        
+                (blast_hit_dict[data[11]][4]).append(float(data[10]))
 
     blast_hit_results.close()
 
-   
-    #Opening and Parsing blast_no_hits_report.txt
-    no_hit_results = open('blast_no_hits_report.txt', 'r')
-    for line in no_hit_results:
-        data = line.split("\t")
-        
-        if line.startswith('SeqID'):
-            continue
-        else:
-            average_trimmed_no_hit_length.append(float(data[4]))
-            no_hit_counter +=1
-            
-            if float(data[4]) == 0:
-                totally_trimmed_counter +=1
-            continue
-    no_hit_results.close
+    return {'blast_hit_counter': blast_hit_counter,  'global_avg_trimmed_length': global_avg_trimmed_length,
+    'hits_avg_trimmed_length': hits_avg_trimmed_length, 'hits_avg_blast_length': hits_avg_blast_length,
+    'hits_avg_score':hits_avg_score, 'hits_avg_percent_identity': hits_avg_percent_identity,
+    'predicted_counter': predicted_counter, 'blast_hit_dict':blast_hit_dict}
 
+
+def summary_blast_report(start_time):
+    """ Prints the final analysis reports from  the blast_report.txt and blast_no_hits_report.txt 
+     :param start_time (see how long program takes to run)
+     :return: summary_blast_report.txt
+     """
+
+    #Getting Hit Results from File
+    hit_data=parsing_hits_data()
+    blast_hit_counter=hit_data['blast_hit_counter']
+    global_avg_trimmed_length=hit_data['global_avg_trimmed_length']
+    hits_avg_trimmed_length=hit_data['hits_avg_trimmed_length']
+    hits_avg_blast_length=hit_data['hits_avg_blast_length']
+    hits_avg_score=hit_data['hits_avg_score']
+    hits_avg_percent_identity=hit_data['hits_avg_percent_identity']
+    predicted_counter=hit_data['predicted_counter']
+    blast_hit_dict=hit_data['blast_hit_dict']
+
+    #Getting No Hit Results from File
+    no_hit_data= parsing_no_hits_data(global_avg_trimmed_length)
+    no_hit_counter=no_hit_data['no_hit_counter']
+    totally_trimmed_counter=no_hit_data['totally_trimmed_counter']
+    average_trimmed_no_hit_length=no_hit_data['average_trimmed_no_hit_length']
+    global_avg_trimmed_length=no_hit_data['global_avg_trimmed_length']
 
     total_counts= blast_hit_counter + no_hit_counter
    
+    #Printing all final results to output files
     summary_report = open('summary_blast_report.txt', 'a')
     summary_report.write("\n")
     summary_report.write("\n")
@@ -527,6 +574,7 @@ def summary_blast_report(start_time):
 
     summary_report.write("Sequences with BLAST Hit Results\n")
     summary_report.write("The number of sequences with BLAST hit results: " + str(blast_hit_counter)+"\n")
+    summary_report.write("The number of genes described as PREDICTED were: " + str(predicted_counter) + "\n")
     summary_report.write("The average trimmed sequence length (pre-BLASTING): " 
         + str(round((np.average(hits_avg_trimmed_length)),2))+"\n")
     summary_report.write("The average sequence BLAST hit length was: " 
@@ -566,6 +614,91 @@ def summary_blast_report(start_time):
 
     summary_report.close()
 
+def tallying_genes():
+    """ Parses the blast_report.txt to tally and count genes that showed up more than once.
+        Specifically searches on accession id
+        param: none
+        return: gene dict (dictionary based on accession ids with corresponding information
+     """
+    #Creating a tallying Mechanism of genes with multiple sequences in file and
+    # an output file for future alignment of sequences 
+    blast_hit_results = open('blast_hits_report.txt', 'r')
+    gene_dict={}
+
+    for line in blast_hit_results:
+        data = line.split("\t")
+       
+        if line.startswith('SeqID'):
+            continue
+        else:
+            #Test to see if organism in dictionary
+            verdict = gene_dict.get(data[6])
+                
+            if str(verdict) == "None":
+                #creating new entry
+                key = data[6]
+                seq_info=str(data[0])+"|"+str(data[1])
+                counter = 1
+                #Value[Counts, Trimmed_Length, Blast Length, Blast_Score, Blast_Percent_Identity]
+                value=[data[5], counter, [seq_info]]
+                gene_dict.update({key:value})
+            else:
+                #Fills dictionary based on organism name
+                seq_info=str(data[0])+"|"+str(data[1])
+                gene_dict[data[6]][1]+=1
+                gene_dict[data[6]][2].append(seq_info)
+    blast_hit_results.close()
+    return(gene_dict)
+
+
+def printing_summary_gene_report(gene_dict):
+    """ Parses the gene dict and prints the final summary report
+    param: gene_dict
+    return: none
+     """
+    #Creating a summary report for data
+    summary_gene_report = open('summary_gene_report.txt', 'w')
+    summary_gene_report.write("Accesssion ID\tDescription\tCounts\n")
+    for key in gene_dict:
+        accession_ID=str(key)    
+        gene_description=str(gene_dict[key][0])
+        gene_counts=str(gene_dict[key][1])
+        summary_gene_report.write(accession_ID+"\t"+gene_description+"\t"+gene_counts+"\n")
+    summary_gene_report.close()
+
+
+def printing_blat_searchable_data(gene_dict):
+    """ Parses the gene dict and prints a report of genes and corresponding sequences for that gene
+    that can blasted/blat to un-cover further information about the sequences and genes
+    param: gene_dict
+    return: none
+     """
+    #Creating a report of all sequences that can searched and then blasted
+    blat_gene_report = open('Log_Directory/blat_gene_seq_report.txt', 'w')
+    blat_gene_report.write("This report was created to allow a user to search specific groups of sequences\n")
+    blat_gene_report.write("for a gene using either BLAST or UCSC Genome Browser to try and possibly identify\n")
+    blat_gene_report.write("a feature that caused enrichment for that gene in the data (length, CNV, highly expressed etc)\n")
+    blat_gene_report.write("\n")
+    blat_gene_report.write("\n")
+    for key in gene_dict:
+        blat_gene_report.write("Gene\tDescription\tCounts\n")
+        gene_description=str(gene_dict[key][0])
+        gene_counts=str(gene_dict[key][1])
+        accession_ID=str(key)
+        gene_description=str(gene_dict[key][0])
+        blat_gene_report.write(accession_ID+"\t"+gene_description+"\t"+gene_counts+"\n")
+
+        blasted_sequences=gene_dict[key][2]
+        for sequences in blasted_sequences:
+            sequences=sequences.split("|")
+            seq_ID=str(sequences[0])
+            sequence=str(sequences[1])
+            blat_gene_report.write(">"+seq_ID+"\n")
+            blat_gene_report.write(sequence+"\n")
+
+        blat_gene_report.write("\n")
+        blat_gene_report.write("\n")
+    blat_gene_report.close()
 
 def main():
     print(entryLine)
@@ -598,7 +731,13 @@ def main():
     print(middleLine)
     
     summary_blast_report(start_time)
+    #Getting the results from blast_hits_report.txt
+    gene_dict=tallying_genes()
+    #Printing the summary reports of analysis
+    printing_summary_gene_report(gene_dict)
+    printing_blat_searchable_data(gene_dict)
     
+
     total_time = time.clock() - start_time
     
     print ("The program ran for ", total_time, " seconds")
