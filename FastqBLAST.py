@@ -259,9 +259,7 @@ def blast_to_dict():
 
     print (blast_dict)
     
-    return blast_dict, GeneIDs, 
-
-
+    
 def fetch_gene_info(gene_list, batch_size=100):
     """
     Uses an NCBI tool called efetch to look up more information about the genes identified by BLAST, then writes
