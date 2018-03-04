@@ -213,7 +213,7 @@ def blast_reads(number_hits, ncbi_database, organism):
         print ("The organism being searched is: ", organism)
         query ='"txid'+str(organism)+'"'
         result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, entrez_query=query, hitlist_size=number_hits,
-            expect=10.0, nucl_penalty=-2, nucl_reward=1, megablast=True, word_size=28, expect_low=True, gapcosts='0 2.5')
+            expect=10.0, nucl_penalty=-2, nucl_reward=1, megablast=True, word_size=28, expect_low=True, gapcosts='0 2')
     else:
         print ("No organism is designated")
         result_handle = NCBIWWW.qblast("blastn", ncbi_database, fasta_string, hitlist_size=number_hits)
