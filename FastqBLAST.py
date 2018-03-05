@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-#Version FastqBLAST_iv4.0.0.py
+#Version FastqBLAST_iv4.0.1.py
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # - - - - - H E A D E R - - - - - - - - - - - - - - - - - - -
@@ -334,9 +334,12 @@ def tabular_report(sample_dictionary, blast_dictionary):
     #creating quick dictionary to pull out trimmed sequence
     trimmed_data_dict={}
     for key in sample_dict.keys():
-        trimmed_sequence=(sample_dict[key]['trimmed_sequence'])
-        key = key.strip('@')
-        trimmed_data_dict.update({key:trimmed_sequence})
+        try:
+            trimmed_sequence=(sample_dict[key]['trimmed_sequence'])
+            key = key.strip('@')
+            trimmed_data_dict.update({key:trimmed_sequence})
+        except KeyError:
+            continue
 
     samples = []
     for sequenceID in sample_dict:
