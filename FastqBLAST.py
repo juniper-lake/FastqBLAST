@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-#Version FastqBLAST_iv4.0.1.py
+#Version FastqBLAST_iv4.0.2.py
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # - - - - - H E A D E R - - - - - - - - - - - - - - - - - - -
@@ -10,10 +10,10 @@
 AUTHOR:         Danielle Novick
 DATE CREATED:   October 24, 2017
 LAST UPDATE:    February 15, 2018
-LAST MODIFIED WITH PERMISSION: March 2, 2018 by M. Joseph Tomlinson IV
+LAST MODIFIED WITH PERMISSION: March 6, 2018 by M. Joseph Tomlinson IV
 MODIFICATIONS: Created Summary Report files, Built in ability to Change Databases and Perform Organism Searches
                Split the Blast results into two files (Hit vs. No Hits), Fixed some minor issues, Fix a big bug with 
-               gene duplicates in data not being reported properly
+               gene duplicates in data not being reported properly, Fixed XML parser so it takes top hit only
 
 OBJECTIVE:      This script takes a sample of sequences from a fastq file, trims the low quality ends, BLASTs them,
                 fetches additional info from NCBI, and produces a report.
@@ -250,6 +250,8 @@ def blast_to_dict():
                 blast_dict[record.query]['Score'] = hsp.score
                 blast_dict[record.query]['E_value'] = hsp.expect
                 blast_dict[record.query]['Percent_Identity'] = percent_identity
+                break
+                
     GeneIDs = list(set(GeneIDs))
     if not GeneIDs:
         print('\nYour BLAST query was rejected. Please enter a smaller sample size or try running this script \
